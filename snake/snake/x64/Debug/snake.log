@@ -1,0 +1,6 @@
+﻿  FileName.cpp
+D:\c++experiment\snake\FileName.cpp(307,57): warning C4244: “参数”: 从“int”转换到“float”，可能丢失数据
+D:\c++experiment\snake\FileName.cpp(307,38): warning C4244: “参数”: 从“int”转换到“float”，可能丢失数据
+D:\c++experiment\snake\FileName.cpp(340,68): warning C4244: “参数”: 从“int”转换到“float”，可能丢失数据
+D:\c++experiment\snake\FileName.cpp(340,44): warning C4244: “参数”: 从“int”转换到“float”，可能丢失数据
+  snake.vcxproj -> D:\c++experiment\snake\x64\Debug\snake.exe
