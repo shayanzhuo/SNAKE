@@ -2,6 +2,7 @@
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <string>
 
 using namespace sf;
 using namespace std;
@@ -11,12 +12,26 @@ const int HEIGHT = 600;
 const int GRID_SIZE = 20;
 const int GRID_WIDTH = WIDTH / GRID_SIZE;
 const int GRID_HEIGHT = HEIGHT / GRID_SIZE;
+
+enum class GameState {
+    MENU,
+    PLAYING,
+    GAME_OVER,
+    HELP,
+    LEVEL_SELECT
+};
+
+enum class Difficulty {
+    EASY,
+    HARD
+};
+
 enum class FoodType {
-    NORMAL,     // ÆÕÍ¨Ê³Îï£¬+1·Ö
-    GOLDEN,     // ½ğÉ«Ê³Îï£¬+5·Ö
-    SPEED_UP,   // ¼ÓËÙÊ³Îï
-    SPEED_DOWN, // ¼õËÙÊ³Îï
-    BONUS       // ÌØÊâ½±Àø
+    NORMAL,     // æ™®é€šé£Ÿç‰©ï¼Œ+1åˆ†
+    GOLDEN,     // é‡‘è‰²é£Ÿç‰©ï¼Œ+5åˆ†
+    SPEED_UP,   // åŠ é€Ÿé£Ÿç‰©
+    SPEED_DOWN, // å‡é€Ÿé£Ÿç‰©
+    BONUS       // ç‰¹æ®Šå¥–åŠ±
 };
 
 struct Food {
@@ -24,104 +39,249 @@ struct Food {
     FoodType type;
     sf::Color color;
     int scoreValue;
-    float effectDuration; // Ğ§¹û³ÖĞøÊ±¼ä(Ãë)
+    float effectDuration; // æ•ˆæœæŒç»­æ—¶é—´(ç§’)
 };
-// ·½ÏòÃ¶¾Ù
-enum class Direction { UP, DOWN, LEFT, RIGHT,None };
 
-// ÉßµÄ¶Î½á¹¹
+// æ–¹å‘æšä¸¾
+enum class Direction { UP, DOWN, LEFT, RIGHT, None };
+
+// è›‡çš„æ®µç»“æ„
 struct SnakeSegment {
     int x, y;
     SnakeSegment(int x, int y) : x(x), y(y) {}
 };
 
-//class FoodSystem {
-//private:
-//    std::vector<Food> foods;
-//    int gridWidth, gridHeight;
-//
-//public:
-//    FoodSystem(int width, int height) : gridWidth(width), gridHeight(height) {}
-//
-//    void spawnFood(const std::vector<SnakeSegment>& snake) {
-//        // Ëæ»ú¾ö¶¨Éú³ÉÄÄÖÖÊ³Îï
-//        FoodType type = getRandomFoodType();
-//
-//        Food newFood;
-//        newFood.type = type;
-//        setFoodProperties(newFood); // ¸ù¾İÀàĞÍÉèÖÃÊôĞÔ
-//
-//        // È·±£Ê³Îï²»»áÉú³ÉÔÚÉßÉíÉÏ
-//        bool onSnake;
-//        do {
-//            onSnake = false;
-//            newFood.x = rand() % gridWidth;
-//            newFood.y = rand() % gridHeight;
-//
-//            for (const auto& segment : snake) {
-//                if (segment.x == newFood.x && segment.y == newFood.y) {
-//                    onSnake = true;
-//                    break;
-//                }
-//            }
-//        } while (onSnake);
-//
-//        foods.push_back(newFood);
-//    }
-//
-//    void removeFood(int index) {
-//        foods.erase(foods.begin() + index);
-//    }
-//
-//    const std::vector<Food>& getFoods() const { return foods; }
-//
-//private:
-//    FoodType getRandomFoodType() {
-//        int randValue = rand() % 100;
-//
-//        if (randValue < 60) return FoodType::NORMAL;      // 60% ÆÕÍ¨Ê³Îï
-//        if (randValue < 85) return FoodType::GOLDEN;      // 25% ½ğÉ«Ê³Îï
-//        if (randValue < 95) return FoodType::SPEED_UP;    // 10% ¼ÓËÙÊ³Îï
-//        if (randValue < 98) return FoodType::SPEED_DOWN;  // 3% ¼õËÙÊ³Îï
-//        return FoodType::BONUS;                           // 2% ÌØÊâ½±Àø
-//    }
-//
-//    void setFoodProperties(Food& food) {
-//        switch (food.type) {
-//        case FoodType::NORMAL:
-//            food.color = sf::Color::Red;
-//            food.scoreValue = 1;
-//            food.effectDuration = 0;
-//            break;
-//        case FoodType::GOLDEN:
-//            food.color = sf::Color::Yellow;
-//            food.scoreValue = 5;
-//            food.effectDuration = 0;
-//            break;
-//        case FoodType::SPEED_UP:
-//            food.color = sf::Color::Green;
-//            food.scoreValue = 2;
-//            food.effectDuration = 10.0f;
-//            break;
-//        case FoodType::SPEED_DOWN:
-//            food.color = sf::Color::Blue;
-//            food.scoreValue = 3;
-//            food.effectDuration = 8.0f;
-//            break;
-//        case FoodType::BONUS:
-//            food.color = sf::Color::Magenta;
-//            food.scoreValue = 10;
-//            food.effectDuration = 15.0f;
-//            break;
-//        }
-//    }
-//};
-// ÓÎÏ·Àà
+// èœå•ç±»
+class Menu {
+private:
+    RenderWindow& window;
+    Font font;
+    vector<Text> menuItems;
+    int selectedItemIndex;
+    Color normalColor;
+    Color selectedColor;
+    Texture backgroundTexture;
+    Sprite backgroundSprite;
+
+public:
+    Menu(RenderWindow& window) : window(window), selectedItemIndex(0) {
+        if (!font.loadFromFile("arial.ttf")) {
+            font.loadFromFile("C:/Windows/Fonts/Arial.ttf");
+        }
+
+        normalColor = Color::White;
+        selectedColor = Color::Green;
+
+        // èœå•é¡¹
+        vector<string> items = { "START", "SELECT", "INSTRUCTION", "EXIT" };
+        
+        for (size_t i = 0; i < items.size(); ++i) {
+            Text item;
+            item.setFont(font);
+            item.setString(items[i]);
+            item.setCharacterSize(36);
+            item.setFillColor(i == selectedItemIndex ? selectedColor : normalColor);
+            item.setPosition(WIDTH / 2 - item.getLocalBounds().width / 2, 
+                             HEIGHT / 2 - (items.size() * 40) / 2 + i * 60);
+            menuItems.push_back(item);
+        }
+
+        // åŠ è½½èƒŒæ™¯
+        if (backgroundTexture.loadFromFile("Images/Background.jpg")) {
+            backgroundSprite.setTexture(backgroundTexture);
+            // è°ƒæ•´èƒŒæ™¯å¤§å°ä»¥é€‚åº”çª—å£
+            backgroundSprite.setScale(
+                float(WIDTH) / backgroundTexture.getSize().x,
+                float(HEIGHT) / backgroundTexture.getSize().y
+            );
+        }
+    }
+
+    void draw() {
+        window.clear();
+        
+        // ç»˜åˆ¶èƒŒæ™¯
+        if (backgroundTexture.getSize() != Vector2u(0, 0)) {
+            window.draw(backgroundSprite);
+        } else {
+            // å¦‚æœèƒŒæ™¯åŠ è½½å¤±è´¥ï¼Œä½¿ç”¨çº¯è‰²èƒŒæ™¯
+            window.clear(Color::Black);
+        }
+
+        // ç»˜åˆ¶èœå•é¡¹
+        for (const auto& item : menuItems) {
+            window.draw(item);
+        }
+
+        window.display();
+    }
+
+    void moveUp() {
+        if (selectedItemIndex > 0) {
+            menuItems[selectedItemIndex].setFillColor(normalColor);
+            selectedItemIndex--;
+            menuItems[selectedItemIndex].setFillColor(selectedColor);
+        }
+    }
+
+    void moveDown() {
+        if (selectedItemIndex < menuItems.size() - 1) {
+            menuItems[selectedItemIndex].setFillColor(normalColor);
+            selectedItemIndex++;
+            menuItems[selectedItemIndex].setFillColor(selectedColor);
+        }
+    }
+
+    int getSelectedItem() const {
+        return selectedItemIndex;
+    }
+};
+
+// å…³å¡é€‰æ‹©èœå•
+class LevelSelect {
+private:
+    RenderWindow& window;
+    Font font;
+    vector<Text> levelItems;
+    int selectedLevelIndex;
+    Color normalColor;
+    Color selectedColor;
+
+public:
+    LevelSelect(RenderWindow& window) : window(window), selectedLevelIndex(0) {
+        if (!font.loadFromFile("arial.ttf")) {
+            font.loadFromFile("C:/Windows/Fonts/Arial.ttf");
+        }
+
+        normalColor = Color::White;
+        selectedColor = Color::Green;
+
+        // å…³å¡é¡¹
+        vector<string> items = { "EASY", "HARD" };
+        
+        for (size_t i = 0; i < items.size(); ++i) {
+            Text item;
+            item.setFont(font);
+            item.setString(items[i]);
+            item.setCharacterSize(36);
+            item.setFillColor(i == selectedLevelIndex ? selectedColor : normalColor);
+            item.setPosition(WIDTH / 2 - item.getLocalBounds().width / 2, 
+                             HEIGHT / 2 - (items.size() * 40) / 2 + i * 60);
+            levelItems.push_back(item);
+        }
+    }
+
+    void draw() {
+        window.clear(Color::Black);
+
+        // ç»˜åˆ¶æ ‡é¢˜
+        Text title;
+        title.setFont(font);
+        title.setString("SELECT");//é€‰æ‹©å…³å¡
+        title.setCharacterSize(48);
+        title.setFillColor(Color::White);
+        title.setPosition(WIDTH / 2 - title.getLocalBounds().width / 2, 100);
+        window.draw(title);
+
+        // ç»˜åˆ¶å…³å¡é¡¹
+        for (const auto& item : levelItems) {
+            window.draw(item);
+        }
+
+        // ç»˜åˆ¶è¿”å›æç¤º
+        Text backHint;
+        backHint.setFont(font);
+        backHint.setString("æŒ‰ ESC è¿”å›ä¸»èœå•");
+        backHint.setCharacterSize(20);
+        backHint.setFillColor(Color::White);
+        backHint.setPosition(20, HEIGHT - 50);
+        window.draw(backHint);
+
+        window.display();
+    }
+
+    void moveUp() {
+        if (selectedLevelIndex > 0) {
+            levelItems[selectedLevelIndex].setFillColor(normalColor);
+            selectedLevelIndex--;
+            levelItems[selectedLevelIndex].setFillColor(selectedColor);
+        }
+    }
+
+    void moveDown() {
+        if (selectedLevelIndex < levelItems.size() - 1) {
+            levelItems[selectedLevelIndex].setFillColor(normalColor);
+            selectedLevelIndex++;
+            levelItems[selectedLevelIndex].setFillColor(selectedColor);
+        }
+    }
+
+    Difficulty getSelectedDifficulty() const {
+        return static_cast<Difficulty>(selectedLevelIndex);
+    }
+};
+
+// å¸®åŠ©/è¯´æ˜ç•Œé¢
+class HelpScreen {
+private:
+    RenderWindow& window;
+    Font font;
+    vector<Text> helpTexts;
+
+public:
+    HelpScreen(RenderWindow& window) : window(window) {
+        if (!font.loadFromFile("arial.ttf")) {
+            font.loadFromFile("C:/Windows/Fonts/Arial.ttf");
+        }
+
+        // æ¸¸æˆè¯´æ˜æ–‡æœ¬
+        vector<string> helpLines = {
+            "è´ªåƒè›‡æ¸¸æˆè¯´æ˜",
+            "",
+            "æ§åˆ¶:",
+            "â†‘ â†“ â† â†’ æ–¹å‘é”® æˆ– WASD - æ§åˆ¶è›‡çš„ç§»åŠ¨",
+            "P - æš‚åœ/ç»§ç»­æ¸¸æˆ",
+            "R - æ¸¸æˆç»“æŸåé‡æ–°å¼€å§‹",
+            "",
+            "æ¸¸æˆç›®æ ‡:",
+            "åƒæ‰é£Ÿç‰©ä½¿è›‡å˜é•¿ï¼Œè·å¾—æ›´é«˜åˆ†æ•°",
+            "",
+            "æ¸¸æˆæ¨¡å¼:",
+            "ç®€å•æ¨¡å¼ - æ’å¢™åè›‡ä¼šæ²¿ç€å¢™æ»‘è¡Œ",
+            "å›°éš¾æ¨¡å¼ - æ’å¢™åæ¸¸æˆç»“æŸ",
+            "",
+            "æŒ‰ ESC è¿”å›ä¸»èœå•"
+        };
+
+        for (size_t i = 0; i < helpLines.size(); ++i) {
+            Text line;
+            line.setFont(font);
+            line.setString(helpLines[i]);
+            line.setCharacterSize(i == 0 ? 36 : 24);
+            line.setFillColor(i == 0 ? Color::Green : Color::White);
+            line.setPosition(WIDTH / 2 - line.getLocalBounds().width / 2, 
+                             100 + i * 40);
+            helpTexts.push_back(line);
+        }
+    }
+
+    void draw() {
+        window.clear(Color::Black);
+
+        for (const auto& text : helpTexts) {
+            window.draw(text);
+        }
+
+        window.display();
+    }
+};
+
+// æ¸¸æˆç±»
 class Game {
 private:
     RenderWindow window;
     vector<SnakeSegment> snake;
-    Direction dir,nextDir;
+    Direction dir, nextDir;
     int foodX, foodY;
     int score;
     bool gameOver;
@@ -133,14 +293,19 @@ private:
     bool paused;
     Texture snakeTexture;
     Texture foodTexture;
-    //FoodSystem foodSystem;
-    float baseSpeed; // »ù´¡ÒÆ¶¯ËÙ¶È
-    float currentSpeed; // µ±Ç°ËÙ¶È(¿ÉÄÜ±»Ê³ÎïĞ§¹ûĞŞ¸Ä)
+    
+    float baseSpeed; // åŸºç¡€ç§»åŠ¨é€Ÿåº¦
+    float currentSpeed; // å½“å‰é€Ÿåº¦(å¯èƒ½è¢«é£Ÿç‰©æ•ˆæœä¿®æ”¹)
     sf::Clock speedEffectClock;
     bool speedEffectActive = false;
     
+    GameState currentState;
+    Menu menu;
+    LevelSelect levelSelect;
+    HelpScreen helpScreen;
+    Difficulty difficulty;
 
-    // Éú³ÉËæ»úÎ»ÖÃ
+    // ç”Ÿæˆéšæœºä½ç½®
     int random(int min, int max) {
         static random_device rd;
         static mt19937 gen(rd());
@@ -148,12 +313,12 @@ private:
         return distrib(gen);
     }
 
-    // ·ÅÖÃÊ³Îï
+    // æ”¾ç½®é£Ÿç‰©
     void placeFood() {
         foodX = random(0, GRID_WIDTH - 1);
         foodY = random(0, GRID_HEIGHT - 1);
 
-        // È·±£Ê³Îï²»»á³öÏÖÔÚÉßÉíÉÏ
+        // ç¡®ä¿é£Ÿç‰©ä¸ä¼šå‡ºç°åœ¨è›‡èº«ä¸Š
         for (const auto& segment : snake) {
             if (segment.x == foodX && segment.y == foodY) {
                 placeFood();
@@ -162,18 +327,16 @@ private:
         }
     }
 
-    // ¼ì²éÅö×²
+    // æ£€æŸ¥ç¢°æ’ - å›°éš¾æ¨¡å¼
     void checkCollision_hard() {
-        // ¼ì²éÊÇ·ñ×²Ç½
+        // æ£€æŸ¥æ˜¯å¦æ’å¢™
         if (snake[0].x < 0 || snake[0].x >= GRID_WIDTH ||
             snake[0].y < 0 || snake[0].y >= GRID_HEIGHT) {
             gameOver = true;
             return;
-
         }
 
-
-        // ¼ì²éÊÇ·ñ×²µ½×Ô¼º
+        // æ£€æŸ¥æ˜¯å¦æ’åˆ°è‡ªå·±
         for (size_t i = 1; i < snake.size(); ++i) {
             if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
                 gameOver = true;
@@ -181,171 +344,149 @@ private:
             }
         }
 
-        // ¼ì²éÊÇ·ñ³Ôµ½Ê³Îï
+        // æ£€æŸ¥æ˜¯å¦åƒåˆ°é£Ÿç‰©
         if (snake[0].x == foodX && snake[0].y == foodY) {
-            // Ôö¼ÓÉßµÄ³¤¶È
+            // å¢åŠ è›‡çš„é•¿åº¦
             snake.push_back(SnakeSegment(foodX, foodY));
 
-            // Ôö¼Ó·ÖÊı
+            // å¢åŠ åˆ†æ•°
             score += 10;
             scoreText.setString("Score: " + to_string(score));
 
-            // Ìá¸ßËÙ¶È
+            // æé«˜é€Ÿåº¦
             speed *= 0.95f;
 
-            // ·ÅÖÃĞÂÊ³Îï
+            // æ”¾ç½®æ–°é£Ÿç‰©
             placeFood();
         }
     }
+    
+    // æ£€æŸ¥ç¢°æ’ - ç®€å•æ¨¡å¼
     void checkCollision_easy() {
-        // ¼ì²éÊÇ·ñ×²Ç½²¢¿ªÊ¼»¬ĞĞ
+        // æ£€æŸ¥æ˜¯å¦æ’å¢™å¹¶å¼€å§‹æ»‘è¡Œ
         if (snake[0].x < 0 || snake[0].x >= GRID_WIDTH ||
             snake[0].y < 0 || snake[0].y >= GRID_HEIGHT) {
 
-            // È·±£ÉßÍ·Í£ÁôÔÚ±ß½çÉÏ
+            // ç¡®ä¿è›‡å¤´åœç•™åœ¨è¾¹ç•Œä¸Š
             snake[0].x = std::clamp(snake[0].x, 0, GRID_WIDTH - 1);
             snake[0].y = std::clamp(snake[0].y, 0, GRID_HEIGHT - 1);
 
-            // ¸ù¾İµ±Ç°·½ÏòÈ·¶¨»¬ĞĞ·½Ïò
+            // æ ¹æ®å½“å‰æ–¹å‘ç¡®å®šæ»‘è¡Œæ–¹å‘
             if (dir == Direction::UP || dir == Direction::DOWN) {
-                // ´¹Ö±ÔË¶¯×²Ç½£¬¸ÄÎªË®Æ½»¬ĞĞ
+                // å‚ç›´è¿åŠ¨æ’å¢™ï¼Œæ”¹ä¸ºæ°´å¹³æ»‘è¡Œ
                 if (snake[0].x < GRID_WIDTH / 2) {
-                    nextDir = Direction::RIGHT; // ¿¿½ü×ó±ß½çÔòÏòÓÒ»¬
+                    nextDir = Direction::RIGHT; // é è¿‘å·¦è¾¹ç•Œåˆ™å‘å³æ»‘
                 }
                 else {
-                    nextDir = Direction::LEFT;  // ¿¿½üÓÒ±ß½çÔòÏò×ó»¬
+                    nextDir = Direction::LEFT;  // é è¿‘å³è¾¹ç•Œåˆ™å‘å·¦æ»‘
                 }
             }
             else {
-                // Ë®Æ½ÔË¶¯×²Ç½£¬¸ÄÎª´¹Ö±»¬ĞĞ
+                // æ°´å¹³è¿åŠ¨æ’å¢™ï¼Œæ”¹ä¸ºå‚ç›´æ»‘è¡Œ
                 if (snake[0].y < GRID_HEIGHT / 2) {
-                    nextDir = Direction::DOWN;  // ¿¿½üÉÏ±ß½çÔòÏòÏÂ»¬
+                    nextDir = Direction::DOWN;  // é è¿‘ä¸Šè¾¹ç•Œåˆ™å‘ä¸‹æ»‘
                 }
                 else {
-                    nextDir = Direction::UP;    // ¿¿½üÏÂ±ß½çÔòÏòÉÏ»¬
+                    nextDir = Direction::UP;    // é è¿‘ä¸‹è¾¹ç•Œåˆ™å‘ä¸Šæ»‘
                 }
-            }dir = nextDir;
-        }
-
-        //// ¼ì²éÊÇ·ñ×²µ½×Ô¼º
-        //for (size_t i = 1; i < snake.size(); ++i) {
-        //    if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
-        //        gameOver = true;
-        //        return;
-        //    }
-        //}
-            // ¼ì²éÊÇ·ñ³Ôµ½Ê³Îï
-            if (snake[0].x == foodX && snake[0].y == foodY) {
-                // Ôö¼ÓÉßµÄ³¤¶È
-                snake.push_back(SnakeSegment(foodX, foodY));
-
-                // Ôö¼Ó·ÖÊı
-                score += 10;
-                scoreText.setString("Score: " + to_string(score));
-
-                // Ìá¸ßËÙ¶È
-                speed *= 0.95f;
-
-                // ·ÅÖÃĞÂÊ³Îï
-                placeFood();
             }
-        
-    }
-    void update() {
-        if (gameOver || paused) return;
-        moveSnake();
-        if (clock.getElapsedTime().asSeconds() >= speed) {
-            clock.restart();
+            dir = nextDir;
+        }
 
-            // Ó¦ÓÃ·½Ïò±ä»¯
-            //dir = nextDir;
+        // æ£€æŸ¥æ˜¯å¦åƒåˆ°é£Ÿç‰©
+        if (snake[0].x == foodX && snake[0].y == foodY) {
+            // å¢åŠ è›‡çš„é•¿åº¦
+            snake.push_back(SnakeSegment(foodX, foodY));
 
-            //if (dir == Direction::None) return;
+            // å¢åŠ åˆ†æ•°
+            score += 10;
+            scoreText.setString("Score: " + to_string(score));
 
-            
-            
-            // ¼ì²éÅö×²
-            checkCollision_easy();
+            // æé«˜é€Ÿåº¦
+            speed *= 0.95f;
 
-            // ¼ì²éÊÇ·ñ³Ôµ½Ê³Îï
-          
-        
+            // æ”¾ç½®æ–°é£Ÿç‰©
+            placeFood();
         }
     }
-    // ÒÆ¶¯Éß
+
+    // ç§»åŠ¨è›‡
     void moveSnake() {
-        // ÒÆ¶¯ÉíÌå
+        // ç§»åŠ¨èº«ä½“
         for (size_t i = snake.size() - 1; i > 0; --i) {
             snake[i].x = snake[i - 1].x;
             snake[i].y = snake[i - 1].y;
         }
 
-        // ÒÆ¶¯Í·²¿
+        // ç§»åŠ¨å¤´éƒ¨
         switch (dir) {
         case Direction::UP:    snake[0].y--; break;
         case Direction::DOWN:  snake[0].y++; break;
         case Direction::LEFT:  snake[0].x--; break;
         case Direction::RIGHT: snake[0].x++; break;
-        //case Direction::None:  break;
         }
     }
-   
-    // »æÖÆÓÎÏ·
+
+    // æ›´æ–°æ¸¸æˆçŠ¶æ€
+    void update() {
+        if (gameOver || paused) return;
+        
+        if (clock.getElapsedTime().asSeconds() >= speed) {
+            clock.restart();
+            
+            // åº”ç”¨æ–¹å‘å˜åŒ–
+            dir = nextDir;
+            
+            // ç§»åŠ¨è›‡
+            moveSnake();
+            
+            // æ ¹æ®éš¾åº¦é€‰æ‹©ç¢°æ’æ£€æµ‹å‡½æ•°
+            if (difficulty == Difficulty::HARD) {
+                checkCollision_hard();
+            } else {
+                checkCollision_easy();
+            }
+        }
+    }
+
+    // ç»˜åˆ¶æ¸¸æˆ
     void draw() {
         window.clear(Color::Black);
 
-        // »æÖÆÊ³Îï
+        // ç»˜åˆ¶é£Ÿç‰©
         Sprite foodSprite(foodTexture);
         if (!foodTexture.loadFromFile("Images/food.jpg")) {
             throw "Failed to load food.";
-
         }
         else {
             foodSprite.setTexture(foodTexture);
-
         }
         foodSprite.setPosition(foodX * GRID_SIZE, foodY * GRID_SIZE);
-        // µ÷Õû´óĞ¡ÒÔÊÊÓ¦Íø¸ñ
+        // è°ƒæ•´å¤§å°ä»¥é€‚åº”ç½‘æ ¼
         foodSprite.setScale(
             float(GRID_SIZE) / foodTexture.getSize().x,
             float(GRID_SIZE) / foodTexture.getSize().y
         );
         window.draw(foodSprite);
-        /*RectangleShape foodRect(Vector2f(GRID_SIZE - 2, GRID_SIZE - 2));
-        foodRect.setFillColor(Color::Red);
-        foodRect.setPosition(foodX * GRID_SIZE + 1, foodY * GRID_SIZE + 1);
-        window.draw(foodRect);*/
 
-        // »æÖÆÉß
+        // ç»˜åˆ¶è›‡
         for (size_t i = 0; i < snake.size(); ++i) {
-            //RectangleShape segment(Vector2f(GRID_SIZE - 2, GRID_SIZE - 2));
-            //segment.setPosition(snake[i].x * GRID_SIZE + 1, snake[i].y * GRID_SIZE + 1);
-
-            //// Í·²¿ÓÃ²»Í¬ÑÕÉ«
-            //if (i == 0) {
-            //    segment.setFillColor(Color::Green);
-            //}
-            //else {
-            //    segment.setFillColor(Color(100, 255, 100)); // Ç³ÂÌÉ«
-            //}
             Sprite segment(snakeTexture);
             if (!snakeTexture.loadFromFile("Images/snake.jpg")) {
                 throw "Failed to load snake.";
-
             }
             else {
                 segment.setTexture(snakeTexture);
-
             }
             segment.setPosition(snake[i].x * GRID_SIZE, snake[i].y * GRID_SIZE);
 
-            // µ÷Õû´óĞ¡
+            // è°ƒæ•´å¤§å°
             segment.setScale(
                 float(GRID_SIZE) / snakeTexture.getSize().x,
                 float(GRID_SIZE) / snakeTexture.getSize().y
             );
 
-            // Í·²¿¿ÉÒÔÓĞ²»Í¬µÄÎÆÀí»òÑÕÉ«
+            // å¤´éƒ¨å¯ä»¥æœ‰ä¸åŒçš„çº¹ç†æˆ–é¢œè‰²
             if (i == 0) {
                 segment.setColor(Color::Green);
             }
@@ -355,10 +496,10 @@ private:
             window.draw(segment);
         }
 
-        // »æÖÆ·ÖÊı
+        // ç»˜åˆ¶åˆ†æ•°
         window.draw(scoreText);
 
-        // Èç¹ûÓÎÏ·½áÊø£¬ÏÔÊ¾ÓÎÏ·½áÊøÎÄ±¾
+        // å¦‚æœæ¸¸æˆç»“æŸï¼Œæ˜¾ç¤ºæ¸¸æˆç»“æŸæ–‡æœ¬
         if (gameOver) {
             window.draw(gameOverText);
         }
@@ -366,11 +507,12 @@ private:
         window.display();
     }
 
-    // ÖØÖÃÓÎÏ·
+    // é‡ç½®æ¸¸æˆ
     void reset() {
         snake.clear();
         snake.push_back(SnakeSegment(GRID_WIDTH / 2, GRID_HEIGHT / 2));
         dir = Direction::RIGHT;
+        nextDir = Direction::RIGHT;
         score = 0;
         speed = 0.1f;
         gameOver = false;
@@ -378,27 +520,127 @@ private:
         placeFood();
     }
 
+    // å¤„ç†èœå•è¾“å…¥
+    void handleMenuInput(Event& event) {
+        if (event.type == Event::KeyPressed) {
+            switch (event.key.code) {
+            case Keyboard::Up:
+                menu.moveUp();
+                break;
+            case Keyboard::Down:
+                menu.moveDown();
+                break;
+            case Keyboard::Enter:
+                switch (menu.getSelectedItem()) {
+                case 0: // å¼€å§‹æ¸¸æˆ
+                    currentState = GameState::PLAYING;
+                    reset();
+                    break;
+                case 1: // é€‰æ‹©å…³å¡
+                    currentState = GameState::LEVEL_SELECT;
+                    break;
+                case 2: // æ¸¸æˆè¯´æ˜
+                    currentState = GameState::HELP;
+                    break;
+                case 3: // é€€å‡º
+                    window.close();
+                    break;
+                }
+                break;
+            }
+        }
+    }
+
+    // å¤„ç†å…³å¡é€‰æ‹©è¾“å…¥
+    void handleLevelSelectInput(Event& event) {
+        if (event.type == Event::KeyPressed) {
+            switch (event.key.code) {
+            case Keyboard::Up:
+                levelSelect.moveUp();
+                break;
+            case Keyboard::Down:
+                levelSelect.moveDown();
+                break;
+            case Keyboard::Enter:
+                difficulty = levelSelect.getSelectedDifficulty();
+                currentState = GameState::MENU;
+                break;
+            case Keyboard::Escape:
+                currentState = GameState::MENU;
+                break;
+            }
+        }
+    }
+
+    // å¤„ç†å¸®åŠ©ç•Œé¢è¾“å…¥
+    void handleHelpInput(Event& event) {
+        if (event.type == Event::KeyPressed && event.key.code == Keyboard::Escape) {
+            currentState = GameState::MENU;
+        }
+    }
+
+    // å¤„ç†æ¸¸æˆè¾“å…¥
+    void handleGameInput(Event& event) {
+        if (event.type == Event::KeyPressed) {
+            if (gameOver && event.key.code == Keyboard::R) {
+                reset();
+            }
+
+            if (event.key.code == Keyboard::P) {
+                paused = !paused;
+            }
+
+            if (!gameOver && !paused) {
+                switch (event.key.code) {
+                case Keyboard::Up:
+                case Keyboard::W:
+                    if (dir != Direction::DOWN) nextDir = Direction::UP;
+                    break;
+                case Keyboard::Down:
+                case Keyboard::S:
+                    if (dir != Direction::UP) nextDir = Direction::DOWN;
+                    break;
+                case Keyboard::Left:
+                case Keyboard::A:
+                    if (dir != Direction::RIGHT) nextDir = Direction::LEFT;
+                    break;
+                case Keyboard::Right:
+                case Keyboard::D:
+                    if (dir != Direction::LEFT) nextDir = Direction::RIGHT;
+                    break;
+                case Keyboard::Escape:
+                    currentState = GameState::MENU;
+                    break;
+                }
+            }
+        }
+    }
+
 public:
-    Game() : window(VideoMode(WIDTH, HEIGHT), "SFML Snake Game"), dir(Direction::RIGHT), score(0), gameOver(false), speed(0.1f), paused(false) {
-        // ³õÊ¼»¯×ÖÌå
+    Game() : window(VideoMode(WIDTH, HEIGHT), "SFML Snake Game"), 
+             dir(Direction::RIGHT), nextDir(Direction::RIGHT), 
+             score(0), gameOver(false), speed(0.1f), paused(false),
+             menu(window), levelSelect(window), helpScreen(window),
+             difficulty(Difficulty::EASY), currentState(GameState::MENU) {
         
+        // åˆå§‹åŒ–å­—ä½“
         if (!font.loadFromFile("arial.ttf")) {
-            // Èç¹û¼ÓÔØÊ§°Ü£¬Ê¹ÓÃÄ¬ÈÏ×ÖÌå
+            // å¦‚æœåŠ è½½å¤±è´¥ï¼Œä½¿ç”¨é»˜è®¤å­—ä½“
             font.loadFromFile("C:/Windows/Fonts/Arial.ttf");
         }
 
-        // ÉèÖÃ·ÖÊıÎÄ±¾
+        // è®¾ç½®åˆ†æ•°æ–‡æœ¬
         scoreText.setFont(font);
         scoreText.setCharacterSize(24);
         scoreText.setFillColor(Color::White);
         scoreText.setPosition(10, 10);
 
-        // ÉèÖÃÓÎÏ·½áÊøÎÄ±¾
+        // è®¾ç½®æ¸¸æˆç»“æŸæ–‡æœ¬
         gameOverText.setFont(font);
         gameOverText.setCharacterSize(48);
         gameOverText.setFillColor(Color::Red);
-        gameOverText.setString("Game Over!\nPress R to restart");
-        gameOverText.setPosition(WIDTH / 2 - 150, HEIGHT / 2 - 50);
+        gameOverText.setString("Game Over!\nPress R to restart\nESC to return to menu");
+        gameOverText.setPosition(WIDTH / 2 - 150, HEIGHT / 2 - 70);
 
         reset();
     }
@@ -411,45 +653,44 @@ public:
                     window.close();
                 }
 
-                // ¼üÅÌÊäÈë´¦Àí
-                if (event.type == Event::KeyPressed) {
-                    if (gameOver && event.key.code == Keyboard::R) {
-                        reset();
-                    }
-
-                    if (event.key.code == Keyboard::P) {
-                        paused = !paused;
-                    }
-
-                    if (!gameOver && !paused) {
-                        switch (event.key.code) {
-                        case Keyboard::Up:
-                            if (dir != Direction::DOWN) dir = Direction::UP;
-                            break;
-                        case Keyboard::Down:
-                            if (dir != Direction::UP) dir = Direction::DOWN;
-                            break;
-                        case Keyboard::Left:
-                            if (dir != Direction::RIGHT) dir = Direction::LEFT;
-                            break;
-                        case Keyboard::Right:
-                            if (dir != Direction::LEFT) dir = Direction::RIGHT;
-                            break;
-                        }
-                    }
+                switch (currentState) {
+                case GameState::MENU:
+                    handleMenuInput(event);
+                    break;
+                case GameState::LEVEL_SELECT:
+                    handleLevelSelectInput(event);
+                    break;
+                case GameState::HELP:
+                    handleHelpInput(event);
+                    break;
+                case GameState::PLAYING:
+                case GameState::GAME_OVER:
+                    handleGameInput(event);
+                    break;
                 }
             }
 
-            // ÓÎÏ·Âß¼­¸üĞÂ
-            if (!gameOver && !paused && clock.getElapsedTime().asSeconds() > speed) {
-                clock.restart();
-                moveSnake();
-                checkCollision_easy();
+            // æ›´æ–°æ¸¸æˆçŠ¶æ€
+            if (currentState == GameState::PLAYING) {
+                update();
             }
 
-            // »æÖÆ
-            draw();
-           
+            // ç»˜åˆ¶å½“å‰çŠ¶æ€
+            switch (currentState) {
+            case GameState::MENU:
+                menu.draw();
+                break;
+            case GameState::LEVEL_SELECT:
+                levelSelect.draw();
+                break;
+            case GameState::HELP:
+                helpScreen.draw();
+                break;
+            case GameState::PLAYING:
+            case GameState::GAME_OVER:
+                draw();
+                break;
+            }
         }
     }
 };
